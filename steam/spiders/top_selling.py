@@ -13,26 +13,35 @@ class TopSellingSpider(scrapy.Spider):
     start_postion = 0
     total_count = 200
     count = 50    
-
+    html=''
     def parse(self, response):
-        html_obj = response.text
-        self.parse_selector(html_obj)
-        print('run here 1?')
+        self.html = response.text
+        yield scrapy.Request(
+            url=response.url,
+            callback=self.parse_selector
+        )
+        
         # TODO:
         # - function parse_slector not run 
     def before_parse(self, response):
-        result = json.loads(response.body)
+        result = json.loads(response.text)
         self.total_count = result.get('total_count')
-        html_obj = result.get('results_html')
-        html_obj = html_obj.replace("\r\n", '')
-        html_obj = html_obj.replace("\t\t", '')
-        self.parse_selector(html_obj)
+        self.html = result.get('results_html')
+        self.html = self.html.replace("\r\n", '')
+        self.html = self.html.replace("\t\t", '')
+        
+        yield scrapy.Request(
+            url=response.url,
+            callback=self.parse_selector,
+            dont_filter = True
+        )
 
-    def parse_selector(self, html_obj):
-        print('run here 2?')
+    def parse_selector(self, response):        
         steam_item = SteamItem()
-        resp = Selector(text=html_obj)
+        resp = Selector(text=self.html)
         list_game = resp.xpath(r'//div[@id="search_resultsRows"]/a')
+        if len(list_game)==0:
+            list_game = resp.xpath(r'//a')
 
         for game in list_game:
             steam_item['game_url'] = game.xpath(r'.//@href').get()
